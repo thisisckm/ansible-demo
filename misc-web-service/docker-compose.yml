@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  misc-web-service:
+    logging:
+      driver: journald
+    image: 824775819187.dkr.ecr.eu-west-2.amazonaws.com/misc-web-service
+    container_name: misc-web-service
+    restart: unless-stopped
+    ports:
+      - 9001:8080

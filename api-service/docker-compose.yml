@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  chameleonerpv1:
+    image: 824775819187.dkr.ecr.eu-west-2.amazonaws.com/erp-v1:latest
+    restart: unless-stopped
+    ports:
+      - 10011:8069
+    volumes:
+      - /mnt/efs-mount-point/odoo-data/live:/mnt/efs-mount-point/odoo-data/live
+      - ./config/odoo.conf:/etc/odoo/odoo.conf
+      - ./logs:/var/log/odoo
+

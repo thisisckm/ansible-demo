@@ -1,0 +1,24 @@
+- name: Deploy Support Server - Portainer
+  hosts: all
+  remote_user: ubuntu
+
+  tasks:
+    - name: Prerequisite 1 - Create Directories
+      file: path={{ item.path }} state=directory owner=ubuntu group=ubuntu mode=0755
+      become: true
+      with_items:
+        - { path: '/home/ubuntu/portainer/' }
+  
+    - name: Prerequisite - Copy required files
+      become: true
+      copy: src={{ item.src }} dest={{ item.dest  }} owner=ubuntu group=ubuntu mode=0644
+      with_items:
+        - { src: './docker-compose.yml', dest: '/home/ubuntu/portainer' }
+      register: compose_file
+
+  
+    - name: Lunch the container
+      shell: "docker compose stop && docker compose pull && docker compose up -d"
+      args:
+        chdir: /home/ubuntu/portainer
+      when: compose_file.changed

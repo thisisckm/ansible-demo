@@ -1,0 +1,64 @@
+- name: Deploy ERP v1 Backend Service 
+  hosts: all
+  remote_user: odoo
+
+  tasks:
+    - name: Prerequisite 1 - Create Directories
+      file: path={{ item.path }} state=directory owner=odoo group=odoo mode=0755
+      become: true
+      with_items:
+        - { path: '/home/odoo/backend-service/' }
+        - { path: '/home/odoo/backend-service/logs' }
+        - { path: '/home/odoo/backend-service/config' }
+  
+    - name: Prerequisite - Copy required files
+      become: true
+      copy: src={{ item.src }} dest={{ item.dest  }} owner=ubuntu group=ubuntu mode=0644
+      with_items:
+        - { src: './docker-compose.yml', dest: '/home/odoo/backend-service' }
+        - { src: './config/odoo.conf', dest: '/home/odoo/backend-service/config' }
+
+    - name: ecr docker get-authorization-token
+      shell: "aws ecr get-authorization-token  --profile default --region eu-west-2"
+      register: ecr_command
+  
+    - set_fact:
+        ecr_authorization_data: "{{ (ecr_command.stdout | from_json).authorizationData[0] }}"
+  
+    - set_fact:
+        ecr_credentials: "{{ (ecr_authorization_data.authorizationToken | b64decode).split(':') }}"
+  
+    - name: docker_repository - Log into ECR registry and force re-authorization
+      docker_login:
+        registry_url: "{{ ecr_authorization_data.proxyEndpoint.rpartition('//')[2] }}"
+        username: "{{ ecr_credentials[0] }}"
+        password: "{{ ecr_credentials[1] }}"
+        reauthorize: yes
+
+    - name: Lunch the container
+      shell: "docker compose stop && docker compose pull && docker compose up -d"
+      args:
+        chdir: /home/odoo/backend-service
+
+    - name: Copy site file
+      copy:
+        src: nginx.conf
+        dest: /etc/nginx/sites-available/backend.chameleonerp.net
+      become: yes
+      become_method: sudo
+      register: site_file
+      
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/backend.chameleonerp.net
+        dest:  /etc/nginx/sites-enabled/backend.chameleonerp.net
+        state: link
+      become: yes
+      become_method: sudo
+    
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+      become: yes
+      when: site_file.changed
